@@ -1,0 +1,43 @@
+#
+# Launches the execution of a Nextflow pipeline in the Nextflow Tower
+# The input parameters shoulld be a JSON object like:
+#
+# {
+#     "actionId": "<alphanumeric numeric ID of the action>",
+#     "token": "********",
+#     "workspaceId": <numeric ID of the workspace>
+# }
+#
+# Author: Gonzalo Carreno ¡ DoiT International
+# 
+#
+
+main:
+    params: [input]
+    steps:
+    - PrepareValues:
+        assign:
+            - actionId: ${input.actionId}
+            - urlToInvoke: ${"https://api.tower.nf/actions/" + actionId +"/launch"}
+            - token: ${input.token}
+            - authorizationHeaderValue: ${"Bearer " + token}
+            - workspaceId: ${input.workspaceId}
+    - InvokeNextflowTower_LaunchPipeline:
+        call: http.post
+        args:
+            url: ${urlToInvoke}
+            headers: 
+                Authorization: ${authorizationHeaderValue}
+                Content-Type: "application/json"
+            query:
+                workspaceId: ${workspaceId}
+            body:
+                params: 
+        result: res
+    - printResponse:
+        call: sys.log
+        args:
+            text: ${res}
+            severity: WARNING
+    - returnOutput:
+            return: ${res}

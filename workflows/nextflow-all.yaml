@@ -1,0 +1,57 @@
+#
+# This sample Google Workflows pipeline invokes two other pipelines as subflows:
+# - 'poc-nextflow-launch' to launch the execution of Nextflow via Nextflow Tower API
+# - 'poc-nextflow-execution-progress-check' to create a wait step in the current pipeline and do not 
+#    proceed with the execution of the next steps without finishing successfully the Nextflow pipeline 
+#
+# The input parameters shoulld be a JSON object like:
+#
+# {
+#     "actionId": "<alphanumeric numeric ID of the action>",
+#     "token": "********",
+#     "workspaceId": <numeric ID of the workspace>
+# }
+#
+# Author: Gonzalo Carreno ¡ DoiT International
+#
+
+main:
+    params: [input]
+    steps:
+    - InitParams:
+        assign:
+        - project: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
+        - location: "us-central1"
+        - arguments:
+            workspaceId: ${input.workspaceId}
+            token: ${input.token}
+            actionId: ${input.actionId}
+    - LaunchProcessing:
+        call: googleapis.workflowexecutions.v1.projects.locations.workflows.executions.run
+        args:
+            workflow_id: poc-nextflow-launch
+            location: "us-central1"
+            project_id: ${project}
+            argument: ${input}
+        result: res
+    - PrintWorkflowId:
+        call: sys.log
+        args:
+            text: ${res.body.workflowId}
+            severity: INFO
+    - DefParams:
+        assign:
+        - arguments2:
+            workspaceId: ${input.workspaceId}
+            token: ${input.token}
+            workflowId: ${res.body.workflowId}
+    - WaitForProcessingFinished:
+        call: googleapis.workflowexecutions.v1.projects.locations.workflows.executions.run
+        args:
+            workflow_id: poc-nextflow-execution-progress-check
+            location: "us-central1"
+            project_id: ${project}
+            argument: ${arguments2}
+        result: res2
+    - returnOutput:
+            return: ${res}

@@ -1,0 +1,49 @@
+# Checks the execution of the pipeline indicated by the workflow id
+# The input parameters shoulld be a JSON object like:
+#
+# {
+#     "token": "****",
+#     "workflowId": "<alphanumeric numeric ID of the workflow>",
+#     "workspaceId":  <numeric ID of the workspace>
+# }
+#
+# Author: Gonzalo Carreno ¡ DoiT International
+#
+
+main:
+    params: [input]
+    steps:
+    - PrepareParameters:
+        assign:
+            - workspaceId: ${input.workspaceId}
+            - workflowId: ${input.workflowId}
+            - token: ${input.token}
+            - urlToInvoke: ${"https://api.tower.nf/workflow/" + workflowId }
+            - authorizationHeaderValue: ${"Bearer " + token}
+    - getJobStatus:
+        call: http.get
+        args:
+            url: ${urlToInvoke}
+            headers: 
+                Accept: application/json
+                Authorization: ${authorizationHeaderValue}
+            query:
+                workspaceId: ${workspaceId}
+        result: jobStatus
+    - printResponse:
+        call: sys.log
+        args:
+            text: ${jobStatus}
+            severity: WARNING
+    - checkIfDone:
+        switch:
+            - condition: ${jobStatus.body.workflow.complete == null}
+              next: waitTillFinish
+        next: returnOutput
+    - waitTillFinish:
+        call: sys.sleep
+        args:
+            seconds: 30
+        next: getJobStatus
+    - returnOutput:
+            return: ${jobStatus}
